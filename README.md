@@ -1,3 +1,2 @@
-# Kitchen-Inventory
+# Trading-Cards
 SE370 Project
-klhjlkj
