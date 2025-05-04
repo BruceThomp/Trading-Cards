@@ -1,4 +1,5 @@
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
@@ -50,11 +51,27 @@ public class TradingCardApp extends JFrame {
         exitButton.setFocusPainted(false);
         exitButton.setPreferredSize(new Dimension(150, 40));  // Set preferred size for the button
 
+        JTextField searchField = new JTextField(20);
+        searchField.setPreferredSize(new Dimension(200, 30));
+        searchField.setFont(new Font("Arial", Font.BOLD, 14));
+
+        JButton searchButton = new JButton("Search");
+        searchButton.setBackground(new Color(33, 150, 243));
+        searchButton.setForeground(Color.WHITE);
+        searchButton.setFocusPainted(false);
+        searchButton.setPreferredSize(new Dimension(100,30));
+
+        controlPanel.add(searchField);
+        controlPanel.add(searchButton);
+
+
         // Add buttons to control panel
         controlPanel.add(addButton);
         controlPanel.add(removeButton);
         controlPanel.add(exitButton);
         add(controlPanel, BorderLayout.NORTH);
+
+
 
         // Card display area
         cardPanel = new JPanel();
@@ -67,8 +84,12 @@ public class TradingCardApp extends JFrame {
         addButton.addActionListener(e -> addCard());
         removeButton.addActionListener(e -> removeCard());
         exitButton.addActionListener(e -> {
-            UserManager.saveCollection(currentUser, cardCollection);
-            System.exit(0);
+            int confirmation = JOptionPane.showConfirmDialog(this, "Are you sure you want to exit? \nYour collection will be saved regardless.", "Confirm Exit", JOptionPane.YES_NO_OPTION);
+           if (confirmation == JOptionPane.YES_OPTION) {
+               UserManager.saveCollection(currentUser, cardCollection);
+
+               System.exit(0);
+           }
         });
 
         // Update card display
@@ -80,13 +101,22 @@ public class TradingCardApp extends JFrame {
     private void addCard() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Select a Card Image");
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("Image Files (JPG,PNG,GIF)", "jpg", "png", "gif");
+        fileChooser.setFileFilter(filter);
         if (fileChooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
         File imageFile = fileChooser.getSelectedFile();
         String name = JOptionPane.showInputDialog(this, "Enter card name:");
-        String year = JOptionPane.showInputDialog(this, "Enter card year:");
-        String type = JOptionPane.showInputDialog(this, "Enter card type:");
+        if(name == null || name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter a card name", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        String year = JOptionPane.showInputDialog(this, "Enter card year (or leave blank):");
+        if(year == null || year.isEmpty())  year = "N/A" ;
 
+        String type = JOptionPane.showInputDialog(this, "Enter card type(or leave blank):");
+        if(type == null || type.isEmpty()) type = "N/A";
+        //Validating the image and if updateCardDisplay checks to see if it's viable for upload or not
         if (name != null && year != null && type != null) {
             cardCollection.add(new TradingCard(imageFile.getAbsolutePath(), name, year, type));
             updateCardDisplay();
@@ -102,14 +132,39 @@ public class TradingCardApp extends JFrame {
         String nameToRemove = JOptionPane.showInputDialog(this, "Enter the name of the card to remove:");
         if (nameToRemove == null || nameToRemove.trim().isEmpty()) return;
 
-        boolean removed = cardCollection.removeIf(card -> card.getName().equalsIgnoreCase(nameToRemove));
-        if (!removed) {
-            JOptionPane.showMessageDialog(this, "❌ No card found with that name.", "Error", JOptionPane.ERROR_MESSAGE);
+        ArrayList<TradingCard> matches = new ArrayList<>();
+        for (TradingCard card : cardCollection) {
+            if (card.getName().equals(nameToRemove.trim())) {
+                matches.add(card);
+            }
         }
-
-        updateCardDisplay();
+        if (matches.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No card found with that name.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        TradingCard selectedCard;
+        if (matches.size() == 1) {
+            selectedCard = matches.get(0);
+        } else {
+            String[] options = new String[matches.size()];
+            for (int i = 0; i < matches.size(); i++) {
+                TradingCard c = matches.get(i);
+                options[i] = String.format("Name: %s | Year: %s | Type: %s", c.getName(), c.getYear(), c.getType());
+            }
+            String selected = (String) JOptionPane.showInputDialog(this, "Select the card to remove:",
+                    "Choose Card", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+            if (selected == null) return; //user cancels the remove process
+            selectedCard = matches.get(java.util.Arrays.asList(options).indexOf(selected));
+        }
+//confirms with user before it removes card
+        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to remove this card?\n" + selectedCard.getName() + "(" + selectedCard.getYear() + " _ " + selectedCard.getType() + ")",
+                "Confirm ", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            cardCollection.remove(selectedCard);
+            updateCardDisplay();
+            JOptionPane.showMessageDialog(this, "Card Removed.", "Info", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
-
     private void updateCardDisplay() {
         cardPanel.removeAll();
 
@@ -120,7 +175,17 @@ public class TradingCardApp extends JFrame {
             panel.setLayout(new BorderLayout());
 
             // Image Label
-            ImageIcon icon = new ImageIcon(card.getImagePath());
+            ImageIcon icon;
+                    try {
+                        icon = new ImageIcon(card.getImagePath());
+                        //checks if image did/nt load
+                        if (icon.getIconWidth() == -1) { //-1 detects if the image is broken or missing
+                            throw new IOException("Invalid Image please try again");
+                        }
+                    }
+                    catch (Exception e) {
+                        icon = new ImageIcon(card.getImagePath());
+                    }
             Image scaledImg = icon.getImage().getScaledInstance(150, 200, Image.SCALE_SMOOTH);
             JLabel imgLabel = new JLabel(new ImageIcon(scaledImg));
 
@@ -149,9 +214,16 @@ public class TradingCardApp extends JFrame {
     }
 
     public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+        }catch(Exception e) {
+            System.out.println("Nimbus Look and Feel Not Supported");
+        }
         SwingUtilities.invokeLater(() -> {
             String user = UserManager.promptLogin();
             if (user != null) new TradingCardApp(user);
         });
     }
 }
+
+

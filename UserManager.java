@@ -52,7 +52,9 @@ public class UserManager {
     }
 
     private static String createAccount(Map<String, String> users) {
+        JOptionPane.showMessageDialog(null, "Usernames and Passwords are case-sensitive.", "Case Sensitivity Notice", JOptionPane.INFORMATION_MESSAGE);
         String username = JOptionPane.showInputDialog("Choose a username:");
+
         if (username == null || username.trim().isEmpty()) return null;
 
         if (users.containsKey(username)) {
