@@ -3,29 +3,31 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 
 public class TradingCardApp extends JFrame {
-    private ArrayList<TradingCard> cardCollection = new ArrayList<>();
-    private JPanel cardPanel;
-    private String currentUser;
+    private ArrayList<TradingCard> cardCollection = new ArrayList<>(); //makes an array list that stores the cards within the collection
+    private JPanel cardPanel; //used for panel display, each card will have its own panel
+    private String currentUser; //displayed in the top of the window - stores/displays username
 
     public TradingCardApp(String username) {
         this.currentUser = username;
         this.cardCollection = UserManager.loadCollection(username);
 
         // Main Frame Setup
-        setTitle("Trading Card Collection - User: " + username);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setTitle("Trading Card Collection - User: " + username); //displays username on top of window
+        setDefaultCloseOperation(EXIT_ON_CLOSE); //exits program when X button or software is closed
         setSize(800, 600);
         setLocationRelativeTo(null); // Center the window
         setLayout(new BorderLayout());
-        setResizable(false);
+        setResizable(true); // makes it so window is resizeable/fullscreen
 
         // Top panel for controls
         JPanel controlPanel = new JPanel();
         controlPanel.setBackground(new Color(40, 40, 40));
         controlPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 20, 10));  // Adjust spacing
+        controlPanel.setPreferredSize(new Dimension(800, 100));
 
         JButton addButton = new JButton("Add Card");
         addButton.setFont(new Font("Arial", Font.BOLD, 14));
@@ -54,6 +56,31 @@ public class TradingCardApp extends JFrame {
         JTextField searchField = new JTextField(20);
         searchField.setPreferredSize(new Dimension(200, 30));
         searchField.setFont(new Font("Arial", Font.BOLD, 14));
+        //allows for live search functionality by updating as search input changes
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { performSearch(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { performSearch(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { performSearch(); }
+
+            private void performSearch() {
+                String query = searchField.getText().trim().toLowerCase();
+                if (query.isEmpty()) {
+                    updateCardDisplay(); // restore full collection
+                    return;
+                }
+
+                ArrayList<TradingCard> filteredCards = new ArrayList<>();
+                for (TradingCard card : cardCollection) {
+                    if (card.getName().toLowerCase().contains(query) ||
+                            card.getYear().toLowerCase().contains(query) ||
+                            card.getType().toLowerCase().contains(query)) {
+                        filteredCards.add(card);
+                    }
+                }
+
+                updateCardDisplay(filteredCards);
+            }
+        });
 
         JButton searchButton = new JButton("Search");
         searchButton.setBackground(new Color(33, 150, 243));
@@ -61,14 +88,44 @@ public class TradingCardApp extends JFrame {
         searchButton.setFocusPainted(false);
         searchButton.setPreferredSize(new Dimension(100,30));
 
+        searchButton.addActionListener(e -> {
+            String query = searchField.getText().trim().toLowerCase();
+            if (query.isEmpty()) {
+                updateCardDisplay(); // Show all if search is empty
+                return;
+            }
+
+            ArrayList<TradingCard> filteredCards = new ArrayList<>();
+            for (TradingCard card : cardCollection) {
+                if (card.getName().toLowerCase().contains(query) ||
+                        card.getYear().toLowerCase().contains(query) ||
+                        card.getType().toLowerCase().contains(query)) {
+                    filteredCards.add(card);
+                }
+            }
+
+            if (filteredCards.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "No Cards matching with search Found");
+            }
+            updateCardDisplay(filteredCards);
+        });
+        searchField.addActionListener(e -> searchButton.doClick());
+
+
         controlPanel.add(searchField);
         controlPanel.add(searchButton);
 
-
+       /* JButton clearButton = new JButton("Clear");
+        clearButton.setBackground(new Color(158, 158, 158)); //light gray color
+        clearButton.setForeground(Color.WHITE);
+        clearButton.setFocusPainted(false);
+        clearButton.setPreferredSize(new Dimension(100, 30));
+*/
         // Add buttons to control panel
         controlPanel.add(addButton);
         controlPanel.add(removeButton);
         controlPanel.add(exitButton);
+      //  controlPanel.add(clearButton);
         add(controlPanel, BorderLayout.NORTH);
 
 
@@ -83,6 +140,11 @@ public class TradingCardApp extends JFrame {
         // Button actions
         addButton.addActionListener(e -> addCard());
         removeButton.addActionListener(e -> removeCard());
+       // clearButton.addActionListener(e -> {
+         //   searchField.setText("");
+           // updateCardDisplay();
+       //
+        // });
         exitButton.addActionListener(e -> {
             int confirmation = JOptionPane.showConfirmDialog(this, "Are you sure you want to exit? \nYour collection will be saved regardless.", "Confirm Exit", JOptionPane.YES_NO_OPTION);
            if (confirmation == JOptionPane.YES_OPTION) {
@@ -165,6 +227,53 @@ public class TradingCardApp extends JFrame {
             JOptionPane.showMessageDialog(this, "Card Removed.", "Info", JOptionPane.INFORMATION_MESSAGE);
         }
     }
+    //overloaded method in order to properly search with different parameters, to be more specific filtered cards
+    private void updateCardDisplay(ArrayList<TradingCard> cardsToDisplay) {
+        cardPanel.removeAll();
+
+        for (TradingCard card : cardsToDisplay) {
+            JPanel panel = new JPanel();
+            panel.setBackground(Color.WHITE);
+            panel.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220), 2));
+            panel.setLayout(new BorderLayout());
+
+            // Image Label
+            ImageIcon icon;
+            try {
+                icon = new ImageIcon(card.getImagePath());
+                if (icon.getIconWidth() == -1) {
+                    throw new IOException("Invalid image");
+                }
+            } catch (Exception e) {
+                icon = new ImageIcon(); // fallback if image is broken
+            }
+            Image scaledImg = icon.getImage().getScaledInstance(150, 200, Image.SCALE_SMOOTH);
+            JLabel imgLabel = new JLabel(new ImageIcon(scaledImg));
+
+            // Info Label
+            JPanel infoPanel = new JPanel();
+            infoPanel.setBackground(Color.WHITE);
+            infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+            JLabel nameLabel = new JLabel("Name: " + card.getName());
+            JLabel yearLabel = new JLabel("Year: " + card.getYear());
+            JLabel typeLabel = new JLabel("Type: " + card.getType());
+            nameLabel.setFont(new Font("Arial", Font.BOLD, 12));
+            yearLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+            typeLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+            infoPanel.add(nameLabel);
+            infoPanel.add(yearLabel);
+            infoPanel.add(typeLabel);
+
+            panel.add(imgLabel, BorderLayout.CENTER);
+            panel.add(infoPanel, BorderLayout.SOUTH);
+
+            cardPanel.add(panel);
+        }
+
+        cardPanel.revalidate();
+        cardPanel.repaint();
+    }
+
     private void updateCardDisplay() {
         cardPanel.removeAll();
 
