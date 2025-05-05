@@ -52,8 +52,10 @@ public class UserManager {
     }
 
     private static String createAccount(Map<String, String> users) {
+        JOptionPane.showMessageDialog(null, "Usernames and Passwords are case-sensitive.", "Case Sensitivity Notice", JOptionPane.INFORMATION_MESSAGE);
         String username = JOptionPane.showInputDialog("Choose a username:");
-        if (username == null || username.trim().isEmpty()) return null;
+        if (username == null) return null;
+        username = username.trim();
 
         if (users.containsKey(username)) {
             JOptionPane.showMessageDialog(null, "Username already exists.");
@@ -61,7 +63,8 @@ public class UserManager {
         }
 
         String password = JOptionPane.showInputDialog("Choose a password:");
-        if (password == null || password.trim().isEmpty()) return null;
+        if (password == null )return null;
+        password = password.trim();
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(USERS_FILE, true))) {
             writer.write(username + ":" + password);
@@ -78,8 +81,10 @@ public class UserManager {
         String username = JOptionPane.showInputDialog("Enter username:");
         if (username == null || username.trim().isEmpty()) return null;
 
+        username = username.trim();
         String password = JOptionPane.showInputDialog("Enter password:");
         if (password == null || password.trim().isEmpty()) return null;
+        password = password.trim();
 
         if (users.containsKey(username) && users.get(username).equals(password)) {
             return username;
